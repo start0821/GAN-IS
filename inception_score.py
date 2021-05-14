@@ -15,7 +15,7 @@ def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1, clas
 
     imgs -- Torch dataset of (3xHxW) numpy images normalized in the range [-1, 1]
     cuda -- whether or not to run on GPU
-    batch_size -- batch size for feeding into Inception v3
+    batch_size -- batch size for feeding into Classifier
     splits -- number of splits
     """
     N = len(imgs)
@@ -81,7 +81,7 @@ def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1, clas
         for i in range(part.shape[0]):
             pyx = part[i, :]
             scores[i] = kl_d(py.log(),pyx)
-        split_scores[i] = torch.exp(torch.mean(scores))
+        split_scores[k] = torch.exp(torch.mean(scores))
 
     return torch.mean(split_scores), torch.std(split_scores)
 

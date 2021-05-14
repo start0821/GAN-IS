@@ -26,7 +26,7 @@ parser.add_argument('--outf', default='.', help='folder to output images and mod
 parser.add_argument('--manualSeed', type=int, help='manual seed')
 parser.add_argument('--nsamples', type=int, default=1000, required=True, help='number of image to evaluate IS')
 
-# check there is a gradient flow in the named_parameters
+# check whether there is a gradient flow in the model
 def print_grad_flow(named_parameters):
     ave_grads = []
     layers = []
@@ -41,6 +41,7 @@ print(args)
 
 num_gpu = 1 if torch.cuda.is_available() else 0
 
+# GAN
 netD = Discriminator(ngpu=1).train()
 netG = Generator(ngpu=1).train()
 # classifier
@@ -51,7 +52,6 @@ netD.load_state_dict(torch.load(args.netD))
 netG.load_state_dict(torch.load(args.netG))
 netC.load_state_dict(torch.load(args.netC))
 
-
 if torch.cuda.is_available():
     netD = netD.cuda()
     netG = netG.cuda()
@@ -59,10 +59,9 @@ if torch.cuda.is_available():
 
 latent_size = args.nz
 batch_size = args.batchSize
-
 num_images = args.nsamples
-# nsamples * # of channel * H * W
-fake_images = torch.zeros((num_images,1,28,28))
+
+fake_images = torch.zeros((num_images,1,28,28)) # nsamples * # of channel * H * W
 
 for s in range(0,num_images,batch_size):
     if s+batch_size>=num_images:
@@ -79,9 +78,11 @@ for s in range(0,num_images,batch_size):
 optimizerG = torch.optim.Adam(netG.parameters(), lr=args.lr, betas=(args.beta1, 0.999))
 
 optimizerG.zero_grad()
-print(netG.main[0].weight.grad)
 
+# IS = (mean(inception_score), std(inception_score))
 IS = inception_score(fake_images, cuda=True, batch_size=32, resize=False, splits=10, classifier=netC, log_logit=True)
 IS[0].backward()
+
 print_grad_flow(netG.named_parameters())
+
 optimizerG.step()

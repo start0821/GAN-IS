@@ -2,5 +2,5 @@
 
 simply check whether gradient flows to GAN model
 ``` bash
-  python example_gan_is.py --nsamples 100 --cuda
+  python IS_gradient_check.py --nsamples 100 --cuda
 ```
