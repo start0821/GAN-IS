@@ -14,13 +14,17 @@ data_train = MNIST(data_root,
                    download=True,
                    transform=transforms.Compose([
                     #    transforms.Resize((32, 32)),
-                       transforms.ToTensor()]))
+                       transforms.ToTensor(),
+                      transforms.Normalize((0.5,), (0.5,)),
+                       ]))
 data_test = MNIST(data_root,
                   train=False,
                   download=True,
                   transform=transforms.Compose([
                     #   transforms.Resize((32, 32)),
-                      transforms.ToTensor()]))
+                      transforms.ToTensor(),
+                      transforms.Normalize((0.5,), (0.5,)),
+                      ]))
 data_train_loader = DataLoader(data_train, batch_size=256, shuffle=True, num_workers=8)
 data_test_loader = DataLoader(data_test, batch_size=1024, num_workers=8)
 
@@ -46,7 +50,6 @@ def train(epoch):
 #         if i % 10 == 0:
 #             print('Train - Epoch %d, Batch: %d, Loss: %f' % (epoch, i, loss.detach().cpu().item()))
 
-        print(net.fc[0].weight.grad)
         loss.backward()
         optimizer.step()
 
