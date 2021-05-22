@@ -1,2 +1,7 @@
 **/__pycache__
+.vscode
+
 data/*
+samples/*
+
+./inception_score_real.py
