@@ -44,7 +44,7 @@ def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1, clas
             if resize:
                 x = up(x)
             x = inception_model(x)
-            return F.softmax(x).data
+            return F.softmax(x).cpu()
     else:
         classifier.eval()
         def get_pred(x):
@@ -110,4 +110,4 @@ if __name__ == '__main__':
     IgnoreLabelDataset(cifar)
 
     print ("Calculating Inception Score...")
-    print (inception_score(IgnoreLabelDataset(cifar), cuda=True, batch_size=200, resize=True, splits=10))
+    print (inception_score(IgnoreLabelDataset(cifar), cuda=True, batch_size=200, resize=True, splits=1))
