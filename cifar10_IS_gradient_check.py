@@ -2,10 +2,9 @@ import argparse
 import torch
 
 # load the models
-from mnist_dcgan.dcgan import Discriminator, Generator
-from mnist_classifier.lenet import LeNet5
+from cifar10_dcgan.dcgan import Discriminator, Generator
 
-from inception_score import inception_score
+from metrics.inception_score import inception_score
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--batchSize', type=int, default=64, help='input batch size')
@@ -18,9 +17,8 @@ parser.add_argument('--lr', type=float, default=0.0002, help='learning rate, def
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
 parser.add_argument('--cuda', action='store_true', help='enables cuda')
 parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
-parser.add_argument('--netG', default='mnist_dcgan/weights/netG_epoch_99.pth', help="path to netG (to continue training)")
-parser.add_argument('--netD', default='mnist_dcgan/weights/netD_epoch_99.pth', help="path to netD (to continue training)")
-parser.add_argument('--netC', default='mnist_classifier/weights/lenet_epoch=26_test_acc=0.990.pth', help="path to netC (to continue training)")
+parser.add_argument('--netG', default='cifar10_dcgan/weights/netG_epoch_199.pth', help="path to netG (to continue training)")
+parser.add_argument('--netD', default='cifar10_dcgan/weights/netD_epoch_199.pth', help="path to netD (to continue training)")
 
 parser.add_argument('--outf', default='.', help='folder to output images and model checkpoints')
 parser.add_argument('--manualSeed', type=int, help='manual seed')
@@ -44,24 +42,20 @@ num_gpu = 1 if torch.cuda.is_available() else 0
 # GAN
 netD = Discriminator(ngpu=1).train()
 netG = Generator(ngpu=1).train()
-# classifier
-netC = LeNet5().eval()
 
 # load weights
 netD.load_state_dict(torch.load(args.netD))
 netG.load_state_dict(torch.load(args.netG))
-netC.load_state_dict(torch.load(args.netC))
 
 if torch.cuda.is_available():
     netD = netD.cuda()
     netG = netG.cuda()
-    netC = netC.cuda()
 
 latent_size = args.nz
 batch_size = args.batchSize
 num_images = args.nsamples
 
-fake_images = torch.zeros((num_images,1,28,28)) # nsamples * # of channel * H * W
+fake_images = torch.zeros((num_images,3,32,32)) # nsamples * # of channel * H * W
 
 for s in range(0,num_images,batch_size):
     if s+batch_size>=num_images:
@@ -73,16 +67,17 @@ for s in range(0,num_images,batch_size):
     fixed_noise = torch.randn(cur_batch_size, latent_size, 1, 1)
     if torch.cuda.is_available():
         fixed_noise = fixed_noise.cuda()
-    fake_images[s:e] = netG(fixed_noise).cpu()
+    fake_images[s:e] = netG(fixed_noise)
 
 optimizerG = torch.optim.Adam(netG.parameters(), lr=args.lr, betas=(args.beta1, 0.999))
 
 optimizerG.zero_grad()
 
 # IS = (mean(inception_score), std(inception_score))
-IS = inception_score(fake_images, cuda=True, batch_size=32, resize=False, splits=10, classifier=netC, log_logit=True)
-IS[0].backward()
+IS = inception_score(fake_images, cuda=True, batch_size=32, resize=True, splits=1, requires_grad=True)
 
+print(IS)
+IS[0].backward()
 print_grad_flow(netG.named_parameters())
 
 optimizerG.step()

@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from mnist_dcgan.dcgan import Discriminator, Generator
 from mnist_classifier.lenet import LeNet5
 
-from fid_score.fid_score import calculate_fid_given_paths
+from metrics.fid_score import calculate_fid_given_paths
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--batchSize', type=int, default=64, help='input batch size')
@@ -122,7 +122,7 @@ for i,image in enumerate(fake_images):
 if args.cuda is True:
     device = torch.device('cuda' if (torch.cuda.is_available()) else 'cpu')
 else:
-    device = torch.device(args.device)
+    device = torch.device('cpu')
 
 fid_value = calculate_fid_given_paths(image_dir_pathes,
                                         batch_size,

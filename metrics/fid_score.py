@@ -45,7 +45,7 @@ except ImportError:
     def tqdm(x):
         return x
 
-from fid_score.lenet import LeNet5
+from metrics.lenet import LeNet5
 
 parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
 parser.add_argument('--batch-size', type=int, default=50,
@@ -252,9 +252,12 @@ def calculate_fid_given_paths(paths, batch_size, device, dims, lenet, num_worker
         if not os.path.exists(p):
             raise RuntimeError('Invalid path: %s' % p)
 
-    block_idx = LeNet5.BLOCK_INDEX_BY_DIM[dims]
-
-    model = LeNet5(lenet,[block_idx]).to(device)
+    if lenet is None:
+        # TODO: Inception Net 
+        pass
+    else:
+        block_idx = LeNet5.BLOCK_INDEX_BY_DIM[dims]
+        model = LeNet5(lenet,[block_idx]).to(device)
 
     m1, s1 = compute_statistics_of_path(paths[0], model, batch_size,
                                         dims, device, num_workers)
