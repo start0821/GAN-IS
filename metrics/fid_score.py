@@ -46,6 +46,7 @@ except ImportError:
         return x
 
 from metrics.lenet import LeNet5
+from metrics.inception import InceptionV3
 
 parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
 parser.add_argument('--batch-size', type=int, default=50,
@@ -254,6 +255,8 @@ def calculate_fid_given_paths(paths, batch_size, device, dims, lenet, num_worker
 
     if lenet is None:
         # TODO: Inception Net 
+        block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[dims]
+        model = InceptionV3([block_idx]).to(device)
         pass
     else:
         block_idx = LeNet5.BLOCK_INDEX_BY_DIM[dims]
