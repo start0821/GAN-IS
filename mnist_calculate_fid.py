@@ -82,7 +82,7 @@ fake_images = torch.zeros((num_images,1,28,28)) # nsamples * # of channel * H * 
 # patch fake images, real images
 print("Generating and Saving images")
 # generate real images
-for real_batch in data_train_loader:
+for real_batch in data_test_loader:
     real_images = torch.cat([real_images,torch.tensor(real_batch[0])],dim=0)
 # generate fake images
 for s in range(0,num_images,batch_size):
@@ -130,6 +130,6 @@ fid_value = calculate_fid_given_paths(image_dir_pathes,
                                         120,
                                         netC,
                                         args.num_workers)
-print('FID: ', fid_value)
+print('FID (test VS GAN): ', fid_value)
 
 
