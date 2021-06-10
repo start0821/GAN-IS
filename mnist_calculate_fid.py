@@ -59,12 +59,6 @@ latent_size = args.nz
 batch_size = args.batchSize
 num_images = args.nsamples
 
-data_train = MNIST(args.real_data_root,
-                   download=True,
-                   transform=transforms.Compose([
-                       transforms.ToTensor(),
-                      transforms.Normalize((0.5,), (0.5,)),
-                       ]))
 data_test = MNIST(args.real_data_root,
                   train=False,
                   download=True,
@@ -73,17 +67,16 @@ data_test = MNIST(args.real_data_root,
                       transforms.Normalize((0.5,), (0.5,)),
                       ]))
 
-data_train_loader = DataLoader(data_train, batch_size=batch_size, shuffle=True, num_workers=8)
 data_test_loader = DataLoader(data_test, batch_size=batch_size, num_workers=8)
 
-real_images = torch.zeros((0,1,28,28)) # nsamples * # of channel * H * W
+real_test_images = torch.zeros((0,1,28,28)) # nsamples * # of channel * H * W
 fake_images = torch.zeros((num_images,1,28,28)) # nsamples * # of channel * H * W
 
 # patch fake images, real images
 print("Generating and Saving images")
-# generate real images
+# generate real test images
 for real_batch in data_test_loader:
-    real_images = torch.cat([real_images,torch.tensor(real_batch[0])],dim=0)
+    real_test_images = torch.cat([real_test_images,torch.tensor(real_batch[0])],dim=0)
 # generate fake images
 for s in range(0,num_images,batch_size):
     if s+batch_size>=num_images:
@@ -102,18 +95,18 @@ for s in range(0,num_images,batch_size):
     else:
         fake_images[s:e] = netG(fixed_noise).cpu()
     
-real_path = os.path.join(args.outdir,'real')
+real_test_path = os.path.join(args.outdir,'real_test')
 fake_path = os.path.join(args.outdir,'fake')
-image_dir_pathes = [real_path, fake_path]
+image_dir_pathes = [real_test_path, fake_path]
 
 for image_path in image_dir_pathes:
     if os.path.exists(image_path):
         shutil.rmtree(image_path)
     os.makedirs(image_path,exist_ok=True)
 
-# save real images in npy
-for i,image in enumerate(real_images):
-    np.save(os.path.join(real_path,str(i)),image)
+# save real test images in npy
+for i,image in enumerate(real_test_images):
+    np.save(os.path.join(real_test_path,str(i)),image)
 
 # save fake images in npy
 for i,image in enumerate(fake_images):
@@ -131,5 +124,3 @@ fid_value = calculate_fid_given_paths(image_dir_pathes,
                                         netC,
                                         args.num_workers)
 print('FID (test VS GAN): ', fid_value)
-
-

@@ -1,19 +1,16 @@
 # https://github.com/sbarratt/inception-score-pytorch/blob/master/inception_score.py
 
 import torch
-import numpy as np
 from torch import nn
 from torch.nn import functional as F
 import torch.utils.data
 
 from torchvision.models.inception import inception_v3
 
-from metrics.inception import InceptionV3
-
 from tqdm import tqdm
 
 # FIX: classifier
-def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1, classifier=None, log_logit=False, requires_grad=False):
+def inception_score(imgs, score=False, cuda=True, batch_size=33, resize=False, splits=1, classifier=None, log_logit=False, true_dist=None, avg=False, weights = 1, div =0):
     """Computes the inception score of the generated images imgs
 
     imgs -- Torch dataset of (3xHxW) numpy images normalized in the range [-1, 1]
@@ -21,13 +18,8 @@ def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1, clas
     batch_size -- batch size for feeding into Classifier
     splits -- number of splits
     """
-
-    if cuda:
-        device = torch.device('cuda:0')
-    else:
-        device = torch.device('cpu')
-
     N = len(imgs)
+
 
     assert batch_size > 0
     assert N > batch_size
@@ -40,63 +32,77 @@ def inception_score(imgs, cuda=True, batch_size=32, resize=False, splits=1, clas
             print("WARNING: You have a CUDA device, so you should probably set cuda=True")
         dtype = torch.FloatTensor
 
+
     # Set up dataloader
     dataloader = torch.utils.data.DataLoader(imgs, batch_size=batch_size)
 
     ### Load pretrained classifier
     if classifier is None:
         # Load inception model
-        block_idx = InceptionV3.BLOCK_INDEX_BY_DIM['prob']
-        model = InceptionV3([block_idx], requires_grad=requires_grad).to(device)
-        model.eval()
-
-        upsample = torch.nn.Upsample((299,299),mode='bilinear',align_corners=False)
+        inception_model = inception_v3(pretrained=True, transform_input=False).type(dtype)
+        inception_model.eval()
+        up = nn.Upsample(size=(299, 299), mode='bilinear').type(dtype)
         def get_pred(x):
             if resize:
-                x = upsample(x)
-            return model(x)
+                x = up(x)
+            x = inception_model(x)
+            return F.softmax(x).data
     else:
         classifier.eval()
         def get_pred(x):
             x = classifier(x)
             if log_logit:
-                out = x.exp()
+                return x.exp()
             else:
-                out = x
-            if requires_grad == False:
-                out = out.data
-            return out
+                return x
 
     # Get predictions
     output_sample = next(iter(dataloader))
     if cuda:
         output_sample = output_sample.cuda()
-    output_shape = get_pred(output_sample)[0].shape
+    output_shape = get_pred(output_sample).shape
     preds = torch.zeros((N, output_shape[-1]))
-
-    for i, batch in enumerate(tqdm(dataloader), 0):
+    for i, batch in enumerate(dataloader, 0):
         batch = batch.type(dtype)
         batch_size_i = batch.size()[0]
         if cuda:
             batch = batch.cuda()
+        if score:
+            preds[i*batch_size:i*batch_size + batch_size_i] = get_pred(batch).cpu()
+        else:
+            preds[i*batch_size:i*batch_size + batch_size_i] = get_pred(batch)
 
-        preds[i*batch_size:i*batch_size + batch_size_i] = get_pred(batch)[0].cpu()
-    
+    if true_dist is not None and cuda:
+        true_dist = true_dist.cpu()
+
+
+
     # Now compute the mean kl-div
     split_scores = torch.zeros(splits)
-
+    split_reg_term = torch.zeros(splits)
+    
     kl_d = torch.nn.KLDivLoss(reduction='sum')
 
     for k in range(splits):
         part = preds[k * (N // splits): (k+1) * (N // splits), :]
+
         py = torch.mean(part, axis=0)
+        
         scores = torch.zeros(part.shape[0])
+        reg_term = torch.zeros(part.shape[0])
         for i in range(part.shape[0]):
             pyx = part[i, :]
-            scores[i] = kl_d(py.log(),pyx)
+            if true_dist is not None and avg == False:
+                scores[i] = kl_d(py.log(),pyx) 
+                reg_term[i] = kl_d(py.log(), true_dist)
+            elif true_dist is not None and avg == True:
+                scores[i] = kl_d(py.log(),pyx) 
+                reg_term[i] = 0.5 * (kl_d(py.log(), 0.5 * (true_dist + py) ) + kl_d(true_dist.log(), 0.5 * (py + true_dist)))
+            else:
+                scores[i] = kl_d(py.log(),pyx)
         split_scores[k] = torch.exp(torch.mean(scores))
-
-    return torch.mean(split_scores), torch.std(split_scores)
+        split_reg_term[k] = torch.exp(torch.mean(reg_term))
+    return torch.mean(split_scores), torch.std(split_scores), torch.mean(split_reg_term), torch.std(split_reg_term)
 
 if __name__ == '__main__':
     class IgnoreLabelDataset(torch.utils.data.Dataset):
@@ -112,16 +118,15 @@ if __name__ == '__main__':
     import torchvision.datasets as dset
     import torchvision.transforms as transforms
 
-    cifar = dset.CIFAR10(root='./data/cifar10', download=True,
-    train=False,
+    cifar = dset.CIFAR10(root='data/', download=True,
                              transform=transforms.Compose([
+                                 transforms.Scale(32),
                                  transforms.ToTensor(),
+                                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
                              ])
     )
-    
+
     IgnoreLabelDataset(cifar)
-    
-    print(len(cifar))
 
     print ("Calculating Inception Score...")
-    print (inception_score(IgnoreLabelDataset(cifar), cuda=True, batch_size=200, resize=True, splits=1))
+    print (inception_score(IgnoreLabelDataset(cifar), cuda=True, batch_size=200, resize=True, splits=10))
